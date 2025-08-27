@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Guardian Steps — Live</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial;margin:18px}
+    .box{border-radius:8px;padding:12px;margin-bottom:12px;background:#f6f8fa}
+    ul{list-style:none;padding-left:0}
+  </style>
+</head>
+<body>
+  <h2>Guardian Steps — Live Monitor</h2>
+
+  <div class="box">
+    <h3>Recent Attendance</h3>
+    <ul id="attendanceList"></ul>
+  </div>
+
+  <div class="box">
+    <h3>Pulse (Latest readings)</h3>
+    <div id="pulseContainer">No data yet</div>
+  </div>
+
+  <script type="module">
+    // ---- SDK imports (Firebase v9 modular via CDN) ----
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import {
+      getDatabase,
+      ref,
+      onChildAdded,
+      onValue
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
+
+    // ---- paste your firebaseConfig here (from Firebase Console) ----
+    const firebaseConfig = {
+      apiKey: "AIzaSyCMSchlhJmgSUW70k-ZUf_eUcN6TPePnaM",
+      authDomain: "guardian-steps.firebaseapp.com",
+      databaseURL: "https://guardian-steps-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "guardian-steps",
+      storageBucket: "guardian-steps.firebasestorage.app",
+      messagingSenderId: "611988477266",
+      appId: "1:611988477266:web:fb11b27a24e3f2ce9f168b"
+    };
+
+    // init
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // attendance listener (new entries under /attendance)
+    const attendanceListEl = document.getElementById('attendanceList');
+    const attendanceRef = ref(db, 'attendance');
+
+    onChildAdded(attendanceRef, snap => {
+      const d = snap.val(); // expected shape: { tagId:"UID", timestamp:165..., name:"Abi" }
+      const li = document.createElement('li');
+      const t = d.timestamp ? new Date(d.timestamp).toLocaleString() : 'time N/A';
+      li.textContent = `${t} — ${d.tagId || ''} ${d.name ? ' — ' + d.name : ''}`;
+      attendanceListEl.prepend(li);
+    });
+
+    // pulse listener — expects /pulse/<studentId>/latest or /pulse/<studentId>/readings
+    const pulseContainer = document.getElementById('pulseContainer');
+    const pulseRef = ref(db, 'pulse'); // all pulse nodes
+
+    onValue(pulseRef, snap => {
+      const all = snap.val();
+      if (!all) { pulseContainer.textContent = 'No data yet'; return; }
+      // show a quick table of latest BPM per student
+      let html = '<table><tr><th>Student</th><th>BPM</th><th>Updated</th></tr>';
+      for (const studentId in all) {
+        const p = all[studentId];
+        const bpm = p.latest?.bpm ?? p.bpm ?? '—';
+        const ts = p.latest?.timestamp ?? p.timestamp ?? null;
+        const time = ts ? new Date(ts).toLocaleTimeString() : '—';
+        html += `<tr><td>${studentId}</td><td>${bpm}</td><td>${time}</td></tr>`;
+      }
+      html += '</table>';
+      pulseContainer.innerHTML = html;
+    });
+
+  </script>
+</body>
+</html>
